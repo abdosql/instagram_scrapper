@@ -130,7 +130,8 @@ class InstagramScraper:
         last_count = 0
         no_change_count = 0
         scroll_position = 0
-        scroll_increment = 1000  # Increased scroll increment
+        scroll_increment = 1000
+        max_no_change_attempts = 5  # Number of attempts before concluding we've reached the end
         
         while True:
             # Get current loaded elements directly from the dialog
@@ -140,30 +141,40 @@ class InstagramScraper:
             
             if current_count == last_count:
                 no_change_count += 1
-                if no_change_count >= 3:  # If no change after 3 attempts
-                    try:
-                        # Try scrolling to the last element
-                        if elements:
-                            last_element = elements[-1]
-                            self.driver.execute_script("arguments[0].scrollIntoView(true);", last_element)
-                            time.sleep(1.5)
-                        
-                        # Try a larger scroll jump
-                        scroll_position += scroll_increment * 2
-                        self.driver.execute_script(
-                            f"arguments[0].scrollTop = {scroll_position};", 
-                            dialog
-                        )
-                        time.sleep(1.5)
-                        
-                        no_change_count = 0  # Reset counter
-                    except Exception as e:
-                        print(f"\nScroll error: {e}")
-                        if current_count < 100:  # If we haven't loaded many followers, keep trying
-                            continue
-                        break
+                if no_change_count >= max_no_change_attempts:
+                    print(f"\nNo new followers found after {max_no_change_attempts} attempts. Reached the end!")
+                    break
+                    
+                # Try different scrolling techniques before giving up
+                try:
+                    # Method 1: Scroll to last element
+                    if elements:
+                        last_element = elements[-1]
+                        self.driver.execute_script("arguments[0].scrollIntoView(true);", last_element)
+                        time.sleep(1)
+                    
+                    # Method 2: Large jump scroll
+                    scroll_position += scroll_increment * 2
+                    self.driver.execute_script(
+                        f"arguments[0].scrollTop = {scroll_position};", 
+                        dialog
+                    )
+                    time.sleep(1)
+                    
+                    # Method 3: Random scroll position
+                    random_scroll = random.randint(int(scroll_position * 0.8), int(scroll_position * 1.2))
+                    self.driver.execute_script(
+                        f"arguments[0].scrollTop = {random_scroll};", 
+                        dialog
+                    )
+                    time.sleep(1)
+                    
+                except Exception as e:
+                    print(f"\nScroll error: {e}")
             else:
-                no_change_count = 0  # Reset if we loaded new items
+                # Reset counter if we found new followers
+                no_change_count = 0
+                print(f"\nFound {current_count - last_count} new followers!")
                 
             # Normal scroll
             try:
@@ -183,17 +194,10 @@ class InstagramScraper:
                 
             except Exception as e:
                 print(f"\nError during scroll: {e}")
-                if current_count < 100:  # If we haven't loaded many followers, keep trying
-                    continue
-                break
+                continue
             
             # Update last count
             last_count = current_count
-            
-            # Break if we've loaded a significant number of followers
-            if current_count >= 5000:
-                print("\nReached target number of followers")
-                break
         
         # Final count
         final_elements = dialog.find_elements(By.CSS_SELECTOR, "a[role='link']")
@@ -221,6 +225,11 @@ class InstagramScraper:
                 time.sleep(3)
                 return []
             
+            # Create timestamp for this scraping session
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            usernames_file = f"usernames_{timestamp}.txt"
+            output_file = f"following_data_{timestamp}.csv"
+            
             # Load target profile page
             print("Loading profile page...")
             self.driver.get(f'https://www.instagram.com/{username}/')
@@ -244,37 +253,39 @@ class InstagramScraper:
             # Scroll the modal
             self.scroll_to_bottom(dialog)
             
-            # Create output file
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_file = f"following_data_{timestamp}.csv"
-            
-            print(f"\nFetching accounts you follow...")
-            print(f"Data will be saved to: {output_file}")
-            
             # Get all following elements
             following_elements = dialog.find_elements(By.CSS_SELECTOR, "a[role='link']")
             
-            # Open CSV file for writing
+            # Process and save usernames first
+            usernames_to_scrape = []
+            print("\nCollecting usernames...")
+            
+            for element in following_elements:
+                try:
+                    href = element.get_attribute('href')
+                    if href and '/instagram.com/' not in href:
+                        username = href.split('/')[-2]
+                        if username and username not in usernames_to_scrape:
+                            usernames_to_scrape.append(username)
+                            print(f"Found username: {username}")
+                except Exception as e:
+                    continue
+            
+            print(f"\nFound {len(usernames_to_scrape)} usernames to scrape")
+            
+            # Save usernames to file
+            with open(usernames_file, 'w', encoding='utf-8') as f:
+                for username in usernames_to_scrape:
+                    f.write(f"{username}\n")
+            print(f"Usernames saved to: {usernames_file}")
+            
+            # Continue with bio scraping automatically
+            print("\nStarting bio scraping...")
+            
+            # Open CSV file for writing bios
             with open(output_file, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.DictWriter(f, fieldnames=['username', 'bio'])
                 writer.writeheader()
-                
-                # Process usernames
-                usernames_to_scrape = []
-                print("\nCollecting usernames...")
-                
-                for element in following_elements:
-                    try:
-                        href = element.get_attribute('href')
-                        if href and '/instagram.com/' not in href:
-                            username = href.split('/')[-2]
-                            if username and username not in usernames_to_scrape:
-                                usernames_to_scrape.append(username)
-                                print(f"Found username: {username}")
-                    except Exception as e:
-                        continue
-                
-                print(f"\nFound {len(usernames_to_scrape)} usernames to scrape")
                 
                 # Process each username for bio
                 for username in usernames_to_scrape:
