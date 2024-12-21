@@ -42,11 +42,23 @@ ENV PYTHONIOENCODING=utf8
 ENV DISPLAY=:0
 ENV DBUS_SESSION_BUS_ADDRESS=/dev/null
 
-# Setup startup script with screen
+# Create helper scripts
+RUN echo '#!/bin/bash' > /app/start-scraper.sh && \
+    echo 'screen -S scraper python -u instagram_scraper.py' >> /app/start-scraper.sh && \
+    chmod +x /app/start-scraper.sh
+
 RUN echo '#!/bin/bash' > /app/start.sh && \
     echo 'Xvfb :0 -screen 0 1024x768x24 &' >> /app/start.sh && \
-    echo 'screen -dmS scraper python -u instagram_scraper.py' >> /app/start.sh && \
-    echo 'screen -r scraper' >> /app/start.sh && \
+    echo 'echo "Instagram Scraper Container"' >> /app/start.sh && \
+    echo 'echo "------------------------"' >> /app/start.sh && \
+    echo 'echo "Commands available:"' >> /app/start.sh && \
+    echo 'echo "1. ./start-scraper.sh    - Start a new scraper session"' >> /app/start.sh && \
+    echo 'echo "2. screen -r scraper     - Reconnect to existing session"' >> /app/start.sh && \
+    echo 'echo "3. screen -ls            - List running sessions"' >> /app/start.sh && \
+    echo 'echo ""' >> /app/start.sh && \
+    echo 'echo "To detach from a running session: Press Ctrl+A, then D"' >> /app/start.sh && \
+    echo 'echo "------------------------"' >> /app/start.sh && \
+    echo 'exec bash' >> /app/start.sh && \
     chmod +x /app/start.sh
 
 # Default command (can be overridden by docker-compose)
