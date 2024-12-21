@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     libx11-xcb1 \
     xdg-utils \
     fonts-liberation \
+    screen \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Chrome using the updated method
@@ -41,9 +42,11 @@ ENV PYTHONIOENCODING=utf8
 ENV DISPLAY=:0
 ENV DBUS_SESSION_BUS_ADDRESS=/dev/null
 
-# Setup Xvfb for headless Chrome
-RUN echo 'Xvfb :0 -screen 0 1024x768x24 &' > /app/start.sh && \
-    echo 'python -u instagram_scraper.py' >> /app/start.sh && \
+# Setup startup script with screen
+RUN echo '#!/bin/bash' > /app/start.sh && \
+    echo 'Xvfb :0 -screen 0 1024x768x24 &' >> /app/start.sh && \
+    echo 'screen -dmS scraper python -u instagram_scraper.py' >> /app/start.sh && \
+    echo 'screen -r scraper' >> /app/start.sh && \
     chmod +x /app/start.sh
 
 # Default command (can be overridden by docker-compose)
