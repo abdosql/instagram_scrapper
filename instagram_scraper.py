@@ -112,7 +112,9 @@ class InstagramScraper:
             
             if os.path.exists(session_file):
                 print("Found existing session, attempting to load...")
-                if self.load_session_from_cookies(username, session_file):
+                with open(session_file, 'r') as f:
+                    cookies = json.load(f)
+                if self.load_session_from_cookies(cookies):
                     print("Session loaded successfully!")
                     return True
                 else:

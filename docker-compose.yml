@@ -9,7 +9,22 @@ services:
       - ./data:/app/data
       # Mount sessions directory to persist login sessions
       - ./sessions:/app/sessions
+      # Mount the script itself for development
+      - ./instagram_scraper.py:/app/instagram_scraper.py
+      # Mount Chrome data directory for persistence
+      - chrome-data:/app/.config/google-chrome
     environment:
-      - PYTHONUNBUFFERED=1  # Ensures Python output is sent straight to terminal
-    stdin_open: true  # Keep STDIN open
-    tty: true        # Allocate a pseudo-TTY 
+      - PYTHONUNBUFFERED=1    # Ensures Python output is sent straight to terminal
+      - DISPLAY=:0            # For Xvfb
+      - PYTHONIOENCODING=utf8 # Ensure proper encoding for input/output
+      - DBUS_SESSION_BUS_ADDRESS=/dev/null
+    stdin_open: true          # Keep STDIN open
+    tty: true                 # Allocate a pseudo-TTY
+    privileged: true          # Required for Chrome in Docker
+    security_opt:
+      - seccomp=unconfined    # Needed for Chrome
+    shm_size: '2gb'           # Shared memory for browser
+    # No need for network_mode: host as we're using Xvfb
+
+volumes:
+  chrome-data:  # Persistent volume for Chrome data
