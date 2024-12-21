@@ -17,6 +17,7 @@ class InstagramScraper:
     def __init__(self):
         self.L = instaloader.Instaloader()
         self.driver = None
+        self.login_username = None  # Add login_username property
         
     def get_cookies_from_browser(self, username: str) -> bool:
         """Get cookies from browser after manual login"""
@@ -198,7 +199,7 @@ class InstagramScraper:
         final_elements = dialog.find_elements(By.CSS_SELECTOR, "a[role='link']")
         print(f"\nScrolling complete. Total followers loaded: {len(final_elements)}")
 
-    def get_following_data(self, username: str) -> List[Dict]:
+    def get_following_data(self, username: str, is_first_load: bool = False) -> List[Dict]:
         """Get following data including username and bio"""
         try:
             # Initialize Chrome if not already initialized
@@ -208,12 +209,19 @@ class InstagramScraper:
                 self.driver = uc.Chrome(options=options)
                 
                 # Apply saved cookies to browser
-                session_file = f"{username}_session.json"
+                session_file = f"{self.login_username}_session.json"  # Use login username for session
                 if os.path.exists(session_file):
                     print("Applying saved session to browser...")
                     self.apply_cookies_to_browser(session_file)
             
-            # Load profile page
+            # If this is first load, just verify login
+            if is_first_load:
+                print("Verifying login...")
+                self.driver.get('https://www.instagram.com/')
+                time.sleep(3)
+                return []
+            
+            # Load target profile page
             print("Loading profile page...")
             self.driver.get(f'https://www.instagram.com/{username}/')
             time.sleep(random.uniform(2, 3))
@@ -312,13 +320,19 @@ class InstagramScraper:
 def main():
     scraper = InstagramScraper()
     
-    # Always prompt for username
-    username = input("Enter your Instagram username: ")
+    # Get login credentials
+    login_username = input("Enter your Instagram username to login: ")
+    scraper.login_username = login_username  # Store login username
     
     # Login using session
-    if scraper.login(username):
+    if scraper.login(login_username):
+        # First verify login by loading Instagram
+        scraper.get_following_data("", is_first_load=True)
+        
+        # Now ask for target account
+        target_username = input("Enter the username of the account you want to scrape followers from: ")
         # Get following data
-        scraper.get_following_data(username)
+        scraper.get_following_data(target_username)
 
 if __name__ == "__main__":
     main() 
