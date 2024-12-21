@@ -17,16 +17,21 @@ class InstagramScraper:
     def __init__(self):
         self.L = instaloader.Instaloader()
         self.driver = None
-        self.login_username = None  # Add login_username property
+        self.login_username = None
         
+        # Create data and sessions directories if they don't exist
+        os.makedirs('data', exist_ok=True)
+        os.makedirs('sessions', exist_ok=True)
+    
     def get_cookies_from_browser(self, username: str) -> bool:
         """Get cookies from browser after manual login"""
         try:
             print("\nNo saved session found. Launching Chrome for Instagram login...")
             
-            # Initialize undetected Chrome driver
             options = uc.ChromeOptions()
             options.add_argument("--start-maximized")
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
             self.driver = uc.Chrome(options=options)
             
             # Open Instagram login page
@@ -40,31 +45,32 @@ class InstagramScraper:
             # Get cookies
             cookies = self.driver.get_cookies()
             
-            # Save cookies to file
-            session_file = f"{username}_session.json"
+            # Save cookies to sessions directory
+            session_file = os.path.join('sessions', f"{username}_session.json")
             with open(session_file, 'w') as f:
                 json.dump(cookies, f)
             
             print(f"Session saved for future use in {session_file}")
             
-            # Load cookies into instaloader session
-            self.load_session_from_cookies(username, session_file)
-            return True
-            
+            return self.load_session_from_cookies(cookies)
         except Exception as e:
-            print(f"Error during browser automation: {e}")
+            print(f"Error during browser cookie extraction: {e}")
             return False
-        finally:
-            if self.driver:
-                self.driver.quit()
-                self.driver = None
     
-    def load_session_from_cookies(self, username: str, session_file: str) -> bool:
+    def load_session_from_file(self, username: str) -> bool:
+        session_file = os.path.join('sessions', f"{username}_session.json")
+        if os.path.exists(session_file):
+            try:
+                with open(session_file, 'r') as f:
+                    cookies = json.load(f)
+                return self.load_session_from_cookies(cookies)
+            except Exception as e:
+                print(f"Error loading session from file: {e}")
+        return False
+    
+    def load_session_from_cookies(self, cookies: List[Dict]) -> bool:
         """Load session from saved cookies"""
         try:
-            with open(session_file, 'r') as f:
-                cookies = json.load(f)
-                
             # Convert cookies to instaloader format
             session_cookies = {}
             for cookie in cookies:
@@ -102,7 +108,7 @@ class InstagramScraper:
         """Login to Instagram account"""
         try:
             # Check for existing session
-            session_file = f"{username}_session.json"
+            session_file = os.path.join('sessions', f"{username}_session.json")
             
             if os.path.exists(session_file):
                 print("Found existing session, attempting to load...")
@@ -213,7 +219,7 @@ class InstagramScraper:
                 self.driver = uc.Chrome(options=options)
                 
                 # Apply saved cookies to browser
-                session_file = f"{self.login_username}_session.json"  # Use login username for session
+                session_file = os.path.join('sessions', f"{self.login_username}_session.json")  # Use login username for session
                 if os.path.exists(session_file):
                     print("Applying saved session to browser...")
                     self.apply_cookies_to_browser(session_file)
@@ -227,8 +233,8 @@ class InstagramScraper:
             
             # Create timestamp for this scraping session
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            usernames_file = f"usernames_{timestamp}.txt"
-            output_file = f"following_data_{timestamp}.csv"
+            usernames_file = os.path.join('data', f"usernames_{timestamp}.txt")
+            output_file = os.path.join('data', f"following_data_{timestamp}.csv")
             
             # Load target profile page
             print("Loading profile page...")
@@ -327,6 +333,14 @@ class InstagramScraper:
             if self.driver:
                 self.driver.quit()
                 self.driver = None
+
+    def save_following_data(self, data: List[Dict], timestamp: str):
+        filename = os.path.join('data', f'following_data_{timestamp}.csv')
+        with open(filename, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=['username', 'bio'])
+            writer.writeheader()
+            writer.writerows(data)
+        print(f"\nData saved to: {filename}")
 
 def main():
     scraper = InstagramScraper()

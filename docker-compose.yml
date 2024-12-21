@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  scraper:
+    build: .
+    container_name: instagram-scraper
+    volumes:
+      # Mount the data directory to persist scraped data
+      - ./data:/app/data
+      # Mount sessions directory to persist login sessions
+      - ./sessions:/app/sessions
+    environment:
+      - PYTHONUNBUFFERED=1  # Ensures Python output is sent straight to terminal
+    stdin_open: true  # Keep STDIN open
+    tty: true        # Allocate a pseudo-TTY 
